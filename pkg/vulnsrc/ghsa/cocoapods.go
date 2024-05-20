@@ -9,8 +9,8 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/xerrors"
 
-	"github.com/aquasecurity/trivy-db/pkg/utils"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/trivy-db/pkg/utils"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
 // Spec is cocoapods struct
