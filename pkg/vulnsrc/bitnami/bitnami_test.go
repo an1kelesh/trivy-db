@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/bitnami"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/bucket"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrctest"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/bitnami"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/bucket"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrctest"
 )
 
 var bucketName = bucket.Name(vulnerability.Bitnami, "Bitnami Vulnerability Database")
