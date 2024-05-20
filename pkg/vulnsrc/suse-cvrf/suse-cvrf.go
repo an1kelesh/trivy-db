@@ -12,7 +12,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/xerrors"
 
-	"github.com/an1kelesh/go-version/pkg/version"
+	"github.com/aquasecurity/go-version/pkg/version"
 	"github.com/an1kelesh/trivy-db/pkg/db"
 	"github.com/an1kelesh/trivy-db/pkg/types"
 	"github.com/an1kelesh/trivy-db/pkg/utils"
