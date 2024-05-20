@@ -14,11 +14,11 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/xerrors"
 
-	"github.com/an1ekelsh/trivy-db/pkg/db"
-	"github.com/an1ekelsh/trivy-db/pkg/types"
-	"github.com/an1ekelsh/trivy-db/pkg/utils"
+	"github.com/an1ekelesh/trivy-db/pkg/db"
+	"github.com/an1ekelesh/trivy-db/pkg/types"
+	"github.com/an1ekelesh/trivy-db/pkg/utils"
 	ustrings "github.com/an1ekelsh/trivy-db/pkg/utils/strings"
-	"github.com/an1ekelsh/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1ekelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
 const (
