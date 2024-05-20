@@ -10,10 +10,10 @@ import (
 	"golang.org/x/xerrors"
 	"gopkg.in/yaml.v2"
 
-	"github.com/aquasecurity/trivy-db/pkg/db"
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/bucket"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/trivy-db/pkg/db"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/bucket"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
 const bundlerDir = "ruby-advisory-db"

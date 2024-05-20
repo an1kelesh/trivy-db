@@ -6,9 +6,9 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/osv"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/osv"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
 const sourceID = vulnerability.GoVulnDB

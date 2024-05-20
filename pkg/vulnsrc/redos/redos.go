@@ -22,9 +22,6 @@ const (
 
 var (
 	altDir = filepath.Join("oval", "alt")
-
-	moduleRegexp = regexp.MustCompile(`Module\s+(.*)\s+is enabled`)
-
 	source = types.DataSource{
 		ID:   vulnerability.ALT,
 		Name: "ALT",

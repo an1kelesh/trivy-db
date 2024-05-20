@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/utils"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/amazon"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrctest"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/utils"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/amazon"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrctest"
 )
 
 func TestMain(m *testing.M) {

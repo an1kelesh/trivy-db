@@ -1,6 +1,6 @@
 package mariner
 
-import "github.com/aquasecurity/trivy-db/pkg/vulnsrc/mariner/oval"
+import "github.com/an1kelesh/trivy-db/pkg/vulnsrc/mariner/oval"
 
 type operator string
 

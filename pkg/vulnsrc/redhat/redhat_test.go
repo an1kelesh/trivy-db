@@ -1,13 +1,13 @@
-package redhat
+ypackage redhat
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/utils"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrctest"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/utils"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrctest"
 )
 
 func TestMain(m *testing.M) {

@@ -12,11 +12,11 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/xerrors"
 
-	"github.com/aquasecurity/go-version/pkg/version"
-	"github.com/aquasecurity/trivy-db/pkg/db"
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/utils"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/vulnerability"
+	"github.com/an1kelesh/go-version/pkg/version"
+	"github.com/an1kelesh/trivy-db/pkg/db"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/utils"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
 type Distribution int
