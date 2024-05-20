@@ -17,7 +17,7 @@ import (
 	"github.com/an1kelesh/trivy-db/pkg/db"
 	"github.com/an1kelesh/trivy-db/pkg/types"
 	"github.com/an1kelesh/trivy-db/pkg/utils"
-	ustrings "github.com/an1kelsh/trivy-db/pkg/utils/strings"
+	ustrings "github.com/an1kelesh/trivy-db/pkg/utils/strings"
 	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 )
 
