@@ -17,14 +17,15 @@ import (
 )
 
 const (
-	rootBucket = "ALT"
+	rootBucket = "redos"
+	redosDir   = "vuln-list-redos"
 )
 
 var (
-	altDir = filepath.Join("oval", "alt")
+	vendorCVEs []CveVendor
 	source = types.DataSource{
-		ID:   vulnerability.ALT,
-		Name: "ALT",
+		ID:   vulnerability.RedOS,
+		Name: "redos",
 		URL:  "",
 	}
 )
@@ -40,11 +41,11 @@ func NewVulnSrc() VulnSrc {
 }
 
 func (vs VulnSrc) Name() types.SourceID {
-	return vulnerability.ALT
+	return vulnerability.RedOS
 }
 
 func (vs VulnSrc) Update(dir string) error {
-	rootDir := filepath.Join(dir, "vuln-list", altDir)
+	rootDir := filepath.Join(dir, redosDir, "oval")
 	branches, err := os.ReadDir(rootDir)
 	if err != nil {
 		return xerrors.Errorf("unable to list directory entries (%s): %w", rootDir, err)
@@ -52,6 +53,7 @@ func (vs VulnSrc) Update(dir string) error {
 
 	advisories := map[bucket]AdvisorySpecial{}
 	for _, branch := range branches {
+		log.Printf("    Parsing %s", branch.Name())
 		branchDir := filepath.Join(rootDir, branch.Name())
 		products, err := os.ReadDir(branchDir)
 		if err != nil {
@@ -59,11 +61,7 @@ func (vs VulnSrc) Update(dir string) error {
 		}
 
 		for _, f := range products {
-			//if !f.IsDir() {
-			//	continue
-			//}
-
-			definitions, err := parseOVALStream(filepath.Join(branchDir, f.Name()))
+			definitions, err := parseOVAL(filepath.Join(branchDir, f.Name()))
 			if err != nil {
 				return xerrors.Errorf("failed to parse OVAL stream: %w", err)
 			}
@@ -72,6 +70,9 @@ func (vs VulnSrc) Update(dir string) error {
 
 		}
 	}
+	if err = vs.putVendorCVEs(); err != nil {
+		return xerrors.Errorf("put vendor cve error: %s", err)
+	}
 	if err = vs.save(advisories); err != nil {
 		return xerrors.Errorf("save error: %w", err)
 	}
@@ -79,20 +80,17 @@ func (vs VulnSrc) Update(dir string) error {
 	return nil
 }
 
-func parseOVALStream(dir string) (map[bucket]DefinitionSpecial, error) {
-	log.Printf("    Parsing %s", dir)
-
-	// Parse tests
+func parseOVAL(dir string) (map[bucket]DefinitionSpecial, error) {
 	tests, err := parseTests(dir)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse ovalTests: %w", err)
+		return nil, xerrors.Errorf("failed to parse tests: %w", err)
 	}
 
 	var definitions Definitions
 
 	err = unmarshalJSONFile(&definitions, path.Join(dir, "definitions.json"))
 	if err != nil {
-		return nil, xerrors.Errorf("ALT OVAL parse error: %w", err)
+		return nil, xerrors.Errorf("RedOS OVAL parse error: %w", err)
 	}
 
 	return parseDefinitions(definitions, tests), nil
@@ -102,19 +100,32 @@ func parseDefinitions(definitions Definitions, tests map[string]RpmInfoTestSpeci
 	defs := map[bucket]DefinitionSpecial{}
 
 	for _, advisory := range definitions.Definition {
-		// Skip unaffected vulnerabilities
 		if strings.Contains(advisory.ID, "unaffected") {
 			continue
 		}
 
-		// Parse criteria
 		affectedPkgs := walkCriterion(advisory.Criteria, tests)
 		for _, affectedPkg := range affectedPkgs {
 			pkgName := affectedPkg.Name
 
-			altID := vendorID(advisory.Metadata.References)
+			redosID := vendorID(advisory.Metadata.References)
 
 			var cveEntries []CveEntry
+			vendorCve := vendorCVE(advisory.Metadata)
+			cveEntries = append(cveEntries, vendorCve)
+
+			vendorCVEs = append(vendorCVEs, CveVendor{CVE: vendorCve, Title: advisory.Metadata.Title,
+				Description: advisory.Metadata.Description, References: toReferences(advisory.Metadata.References)})
+
+			for _, bdu := range advisory.Metadata.Advisory.BDUs {
+				bduEntry := CveEntry{
+					ID:       bdu.CveID,
+					Severity: severityFromImpact(bdu.Impact),
+				}
+				cveEntries = append(cveEntries, bduEntry)
+				vendorCVEs = append(vendorCVEs, CveVendor{CVE: bduEntry, Title: "", Description: "", References: []string{bdu.Href}})
+			}
+
 			for _, cve := range advisory.Metadata.Advisory.Cves {
 				cveEntries = append(cveEntries, CveEntry{
 					ID:       cve.CveID,
@@ -122,10 +133,10 @@ func parseDefinitions(definitions Definitions, tests map[string]RpmInfoTestSpeci
 				})
 			}
 
-			if altID != "" { // For patched vulnerabilities
+			if redosID != "" {
 				bkt := bucket{
 					pkgName: pkgName,
-					vulnID:  altID,
+					vulnID:  redosID,
 				}
 				defs[bkt] = DefinitionSpecial{
 					Entry: Entry{
@@ -135,7 +146,7 @@ func parseDefinitions(definitions Definitions, tests map[string]RpmInfoTestSpeci
 						Arches:          affectedPkg.Arches,
 					},
 				}
-			} else { // For unpatched vulnerabilities
+			} else {
 				for _, cve := range cveEntries {
 					bkt := bucket{
 						pkgName: pkgName,
@@ -172,9 +183,8 @@ func walkCriterion(cri Criteria, tests map[string]RpmInfoTestSpecial) []pkg {
 
 		var arches []string
 		if t.Arch != "" {
-			arches = strings.Split(t.Arch, "|") // affected arches are merged with '|'(e.g. 'aarch64|ppc64le|x86_64')
+			arches = strings.Split(t.Arch, "|")
 		}
-
 		packages = append(packages, pkg{
 			Name:         t.Name,
 			FixedVersion: t.FixedVersion,
@@ -195,36 +205,11 @@ func walkCriterion(cri Criteria, tests map[string]RpmInfoTestSpecial) []pkg {
 	return packages
 }
 
-func vendorID(refs []Reference) string {
-	for _, ref := range refs {
-		switch ref.Source {
-		case "ALTPU":
-			return ref.RefID
-		}
-	}
-	return ""
-}
-
-func severityFromImpact(sev string) types.Severity {
-	switch strings.ToLower(sev) {
-	case "low":
-		return types.SeverityLow
-	case "medium":
-		return types.SeverityMedium
-	case "high":
-		return types.SeverityHigh
-	case "critical":
-		return types.SeverityCritical
-	}
-	return types.SeverityUnknown
-}
-
 func (vs VulnSrc) mergeAdvisories(advisories map[bucket]AdvisorySpecial, defs map[bucket]DefinitionSpecial) map[bucket]AdvisorySpecial {
 	for bkt, def := range defs {
 		if old, ok := advisories[bkt]; ok {
 			found := false
 			for i := range old.Entries {
-				// New advisory should contain a single fixed version and list of arches.
 				if old.Entries[i].FixedVersion == def.Entry.FixedVersion && archesEqual(old.Entries[i].Arches, def.Entry.Arches) {
 					found = true
 					old.Entries[i].AffectedCPEList = ustrings.Merge(old.Entries[i].AffectedCPEList, def.Entry.AffectedCPEList)
@@ -244,18 +229,6 @@ func (vs VulnSrc) mergeAdvisories(advisories map[bucket]AdvisorySpecial, defs ma
 	return advisories
 }
 
-func archesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func (vs VulnSrc) save(advisories map[bucket]AdvisorySpecial) error {
 	err := vs.dbc.BatchUpdate(func(tx *bolt.Tx) error {
 		if err := vs.dbc.PutDataSource(tx, rootBucket, source); err != nil {
@@ -263,7 +236,7 @@ func (vs VulnSrc) save(advisories map[bucket]AdvisorySpecial) error {
 		}
 		for bkt, advisory := range advisories {
 			if err := vs.dbc.PutAdvisoryDetail(tx, bkt.vulnID, bkt.pkgName, []string{rootBucket}, advisory); err != nil {
-				return xerrors.Errorf("failed to save Red Hat OVAL advisory: %w", err)
+				return xerrors.Errorf("failed to RedOS OVAL advisory: %w", err)
 			}
 
 			if err := vs.dbc.PutVulnerabilityID(tx, bkt.vulnID); err != nil {
@@ -274,6 +247,49 @@ func (vs VulnSrc) save(advisories map[bucket]AdvisorySpecial) error {
 	})
 	if err != nil {
 		return xerrors.Errorf("batch update error: %w", err)
+	}
+	return nil
+}
+
+func vendorCVE(metadata Metadata) CveEntry {
+	var id string
+	for _, r := range metadata.References {
+		if strings.Contains(r.RefID, "RedOS") {
+			id = r.RefID
+		}
+	}
+	return CveEntry{ID: id, Severity: severityFromImpact(metadata.Advisory.Severity)}
+}
+
+func (vs VulnSrc) putVendorCVEs() error {
+	err := vs.dbc.BatchUpdate(func(tx *bolt.Tx) error {
+		for _, cve := range vendorCVEs {
+			err := vs.putVendorVulnerabilityDetail(tx, cve)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+func (vs VulnSrc) putVendorVulnerabilityDetail(tx *bolt.Tx, cve CveVendor) error {
+	vuln := types.VulnerabilityDetail{
+		CvssScore:    0,
+		CvssVector:   "",
+		CvssScoreV3:  0,
+		CvssVectorV3: "",
+		Severity:     cve.CVE.Severity,
+		References:   cve.References,
+		Title:        cve.Title,
+		Description:  cve.Description,
+	}
+	if err := vs.dbc.PutVulnerabilityDetail(tx, cve.CVE.ID, vulnerability.RedOS, vuln); err != nil {
+		return xerrors.Errorf("failed to save RedOS vulnerability: %w", err)
+	}
+
+	if err := vs.dbc.PutVulnerabilityID(tx, cve.CVE.ID); err != nil {
+		return xerrors.Errorf("failed to save the vulnerability ID: %w", err)
 	}
 	return nil
 }
@@ -299,7 +315,6 @@ func (vs VulnSrc) Get(pkgName, cpe string) ([]types.Advisory, error) {
 			if !contains(entry.AffectedCPEList, cpe) {
 				continue
 			}
-
 			for _, cve := range entry.Cves {
 				advisory := types.Advisory{
 					Severity:     cve.Severity,
@@ -321,7 +336,6 @@ func (vs VulnSrc) Get(pkgName, cpe string) ([]types.Advisory, error) {
 
 	return advisories, nil
 }
-
 func contains(lst []string, val string) bool {
 	for _, e := range lst {
 		if e == val {
@@ -331,10 +345,47 @@ func contains(lst []string, val string) bool {
 	return false
 }
 
-func cpeToList(cpes []CPE) []string {
-	var list []string
-	for _, cpe := range cpes {
-		list = append(list, cpe.Cpe)
+func toReferences(references []Reference) []string {
+	var data []string
+	for _, r := range references {
+		data = append(data, r.RefURL)
 	}
-	return list
+	return data
+}
+func cpeToList(cpes AffectedCpeList) []string {
+	var list []string
+	return append(list, cpes.Cpe...)
+}
+func archesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+func severityFromImpact(sev string) types.Severity {
+	switch strings.ToLower(sev) {
+	case "low":
+		return types.SeverityLow
+	case "medium":
+		return types.SeverityMedium
+	case "high":
+		return types.SeverityHigh
+	case "critical":
+		return types.SeverityCritical
+	}
+	return types.SeverityUnknown
+}
+func vendorID(refs []Reference) string {
+	for _, ref := range refs {
+		switch ref.Source {
+		case "ALTPU":
+			return ref.RefID
+		}
+	}
+	return ""
 }

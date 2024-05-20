@@ -1,25 +1,8 @@
 package redos
 
 import (
-	"encoding/xml"
 	"github.com/an1kelesh/trivy-db/pkg/types"
 )
-
-type OVAL struct {
-	XMLName     xml.Name    `xml:"oval_definitions"`
-	Generator   Generator   `xml:"generator"`
-	Definitions Definitions `xml:"definitions"`
-
-	Tests   Tests   `xml:"tests" json:",omitempty"`
-	Objects Objects `xml:"objects" json:",omitempty"`
-	States  States  `xml:"states" json:",omitempty"`
-}
-
-type Generator struct {
-	Timestamp     string `xml:"timestamp"`
-	ProductName   string `xml:"product_name"`
-	SchemaVersion string `xml:"schema_version"`
-}
 
 type Definitions struct {
 	Definition []Definition `xml:"definition" json:",omitempty"`
@@ -54,13 +37,21 @@ type Reference struct {
 }
 
 type Advisory struct {
-	From            string  `xml:"from,attr" json:",omitempty"`
-	Severity        string  `xml:"severity" json:",omitempty"`
-	Rights          string  `xml:"rights" json:",omitempty"`
-	Issued          Issued  `xml:"issued" json:",omitempty"`
-	Updated         Updated `xml:"updated" json:",omitempty"`
-	Cves            []CVE   `xml:"cve" json:",omitempty"`
-	AffectedCpeList []CPE   `xml:"affected_cpe_list" json:",omitempty"`
+	From            string		`xml:"from,attr" json:",omitempty"`
+	Severity        string		`xml:"severity" json:",omitempty"`
+	Rights          string		`xml:"rights" json:",omitempty"`
+	Issued          Issued		`xml:"issued" json:",omitempty"`
+	Updated         Updated		`xml:"updated" json:",omitempty"`
+	BDUs            []CVE		`xml:"bdu" json:"bdu"`
+	Cves            []CVE		`xml:"cve" json:",omitempty"`
+	Bugzilla        []Bugzilla	`xml:"bugzilla" json:",omitempty"`
+	AffectedCpeList AffectedCpeList	`xml:"affected_cpe_list" json:",omitempty"`
+}
+
+type Bugzilla struct {
+	Id   string `xml:"id,attr" json:",omitempty"`
+	Href string `xml:"href,attr" json:",omitempty"`
+	Data string `xml:",chardata" json:",omitempty"`
 }
 
 type Issued struct {
@@ -73,14 +64,14 @@ type Updated struct {
 
 type CVE struct {
 	Cvss3  string `xml:"cvss3,attr" json:",omitempty"`
-	Cve    string `xml:"cve,attr"   json:",omitempty"`
+	Cwe    string `xml:"cwe,attr"   json:",omitempty"`
 	Href   string `xml:"href,attr"   json:",omitempty"`
 	Impact string `xml:"impact,attr" json:",omitempty"`
 	Public string `xml:"public,attr" json:",omitempty"`
 	CveID  string `xml:",chardata"  json:",omitempty"`
 }
 
-type CPE struct {
+type AffectedCpeList struct {
 	Cpe string `xml:"cpe" json:",omitempty"`
 }
 
@@ -110,7 +101,7 @@ type TextFileContent54Test struct {
 }
 
 type State struct {
-	StateRef string `xml:"state_ref,attr" json:",omitempty"`
+	ObjectRef string `xml:"object_ref,attr" json:",omitempty"`
 	Text     string `xml:"state" json:",omitempty"`
 }
 
@@ -254,4 +245,11 @@ type CveEntry struct {
 	ID string `json:",omitempty"`
 
 	Severity types.Severity `json:",omitempty"`
+}
+
+type CveVendor struct {
+	Title       string
+	Description string
+	References  []string
+	CVE         CveEntry
 }

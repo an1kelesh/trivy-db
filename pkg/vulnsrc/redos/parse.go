@@ -64,17 +64,12 @@ func parseTests(dir string) (map[string]RpmInfoTestSpecial, error) {
 	}
 
 	var tests Tests
-	if err := unmarshalJSONFile(&tests, filepath.Join(dir, "tests.json")); err != nil {
+	if err = unmarshalJSONFile(&tests, filepath.Join(dir, "tests.json")); err != nil {
 		return nil, xerrors.Errorf("failed to unmarshal states: %w", err)
 	}
 
 	rpmTests := map[string]RpmInfoTestSpecial{}
 	for _, test := range tests.RPMInfoTests {
-		// test.Check should be "at least one"
-		//if test.Check != "at least one" {
-		//	continue
-		//}
-
 		t, err := followTestRefs(test, objects, states)
 		if err != nil {
 			return nil, xerrors.Errorf("unable to follow test refs: %w", err)
@@ -88,17 +83,14 @@ func followTestRefs(test RpmInfoTest, objects map[string]RpmInfoObject, states m
 	var t RpmInfoTestSpecial
 
 	// Follow object ref
-	//if test.Object.ObjectRef == "" {
-	if test.Object.StateRef == "" {
+	if test.Object.ObjectRef == "" {
 		return t, nil
 	}
 
-	//pkgName, ok := objects[test.Object.ObjectRef]
-	obj, ok := objects[test.Object.StateRef]
+	obj, ok := objects[test.Object.ObjectRef]
 	if !ok {
 		return t, xerrors.Errorf("invalid tests data, can't find object ref: %s, test ref: %s",
-			test.Object.StateRef, test.ID)
-		//test.Object.ObjectRef, test.ID)
+			test.Object.ObjectRef, test.ID)
 	}
 	t.Name = obj.Name
 
@@ -113,8 +105,6 @@ func followTestRefs(test RpmInfoTest, objects map[string]RpmInfoObject, states m
 			test.State.StateRef, test.ID)
 	}
 
-	//t.SignatureKeyID = state.SignatureKeyID
-	//
 	if state.Arch.Datatype == "string" && (state.Arch.Operation == "pattern match" || state.Arch.Operation == "equals") {
 		t.Arch = state.Arch.Text
 	}
