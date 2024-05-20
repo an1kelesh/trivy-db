@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/aquasecurity/trivy-db/pkg"
+	"github.com/an1kelesh/trivy-db/pkg"
 )
 
 var (
