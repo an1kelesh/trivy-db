@@ -1,4 +1,4 @@
-ypackage redhat
+package redhat
 
 import (
 	"os"
