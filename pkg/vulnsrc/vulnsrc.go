@@ -1,30 +1,31 @@
 package vulnsrc
 
 import (
-	"github.com/aquasecurity/trivy-db/pkg/types"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/alma"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/alpine"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/amazon"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/bitnami"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/bundler"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/chainguard"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/composer"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/debian"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/ghsa"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/glad"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/govulndb"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/k8svulndb"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/mariner"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/node"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/nvd"
-	oracleoval "github.com/aquasecurity/trivy-db/pkg/vulnsrc/oracle-oval"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/photon"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/redhat"
-	redhatoval "github.com/aquasecurity/trivy-db/pkg/vulnsrc/redhat-oval"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/rocky"
-	susecvrf "github.com/aquasecurity/trivy-db/pkg/vulnsrc/suse-cvrf"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/ubuntu"
-	"github.com/aquasecurity/trivy-db/pkg/vulnsrc/wolfi"
+	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/alma"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/alpine"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/amazon"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/bitnami"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/bundler"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/chainguard"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/composer"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/debian"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/ghsa"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/glad"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/govulndb"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/k8svulndb"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/mariner"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/node"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/redos"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/nvd"
+	oracleoval "github.com/an1kelesh/trivy-db/pkg/vulnsrc/oracle-oval"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/photon"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/redhat"
+	redhatoval "github.com/an1kelesh/trivy-db/pkg/vulnsrc/redhat-oval"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/rocky"
+	susecvrf "github.com/an1kelesh/trivy-db/pkg/vulnsrc/suse-cvrf"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/ubuntu"
+	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/wolfi"
 )
 
 type VulnSrc interface {
@@ -43,6 +44,7 @@ var (
 		alpine.NewVulnSrc(),
 		redhat.NewVulnSrc(),
 		redhatoval.NewVulnSrc(),
+		redos.NewVulnSrc(),
 		debian.NewVulnSrc(),
 		ubuntu.NewVulnSrc(),
 		amazon.NewVulnSrc(),
