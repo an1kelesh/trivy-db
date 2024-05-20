@@ -1,4 +1,4 @@
-'package alpine
+package alpine
 
 import (
 	"encoding/json"
