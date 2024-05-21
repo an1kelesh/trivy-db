@@ -101,5 +101,5 @@ db-fetch-vuln-list:
 	wget -qO - https://github.com/aquasecurity/vuln-list-nvd/archive/main.tar.gz | tar xz -C cache/vuln-list-nvd --strip-components=1
 	mkdir -p cache/vuln-list-k8s
 	wget -qO - https://github.com/aquasecurity/vuln-list-k8s/archive/main.tar.gz | tar xz -C cache/vuln-list-k8s --strip-components=1
-	mkdir -p cache/vuln-list-redos-bdu
+	mkdir -p cache/vuln-list-redos
 	wget -qO - https://github.com/an1kelesh/vuln-list-redos/archive/master.tar.gz | tar xz -C cache/vuln-list-redos --strip-components=1
