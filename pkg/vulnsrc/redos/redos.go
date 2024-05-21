@@ -2,17 +2,19 @@ package redos
 
 import (
 	"encoding/json"
+	"log"
+	"os"
+	"path"
+	"path/filepath"
+
 	"github.com/an1kelesh/trivy-db/pkg/db"
 	"github.com/an1kelesh/trivy-db/pkg/types"
 	ustrings "github.com/an1kelesh/trivy-db/pkg/utils/strings"
 	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/xerrors"
-	"log"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
+
+	//"regexp"
 	"strings"
 )
 
@@ -23,7 +25,7 @@ const (
 
 var (
 	vendorCVEs []CveVendor
-	source = types.DataSource{
+	source     = types.DataSource{
 		ID:   vulnerability.RedOS,
 		Name: "redos",
 		URL:  "",
