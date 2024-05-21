@@ -91,13 +91,5 @@ db-clean:
 
 .PHONY: db-fetch-vuln-list
 db-fetch-vuln-list:
-	mkdir -p cache/vuln-list
-	wget -qO - https://github.com/aquasecurity/vuln-list/archive/main.tar.gz | tar xz -C cache/vuln-list --strip-components=1
-	mkdir -p cache/vuln-list-redhat
-	wget -qO - https://github.com/aquasecurity/vuln-list-redhat/archive/main.tar.gz | tar xz -C cache/vuln-list-redhat --strip-components=1
-	mkdir -p cache/vuln-list-debian
-	wget -qO - https://github.com/aquasecurity/vuln-list-debian/archive/main.tar.gz | tar xz -C cache/vuln-list-debian --strip-components=1
-	mkdir -p cache/vuln-list-nvd
-	wget -qO - https://github.com/aquasecurity/vuln-list-nvd/archive/main.tar.gz | tar xz -C cache/vuln-list-nvd --strip-components=1
-	mkdir -p cache/vuln-list-k8s
-	wget -qO - https://github.com/aquasecurity/vuln-list-k8s/archive/main.tar.gz | tar xz -C cache/vuln-list-k8s --strip-components=1
+	mkdir -p cache/vuln-list-redos-bdu
+	wget -qO - https://github.com/an1kelesh/vuln-list-redos-bdu/archive/main.tar.gz | tar xz -C cache/vuln-list-redos-bdu --strip-components=1
