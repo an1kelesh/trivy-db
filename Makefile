@@ -92,4 +92,4 @@ db-clean:
 .PHONY: db-fetch-vuln-list
 db-fetch-vuln-list:
 	mkdir -p cache/vuln-list-redos-bdu
-	wget -qO - https://github.com/an1kelesh/vuln-list-redos-bdu/archive/main.tar.gz | tar xz -C cache/vuln-list-redos-bdu --strip-components=1
+	wget -qO - https://github.com/an1kelesh/vuln-list-redos-bdu/archive/master.tar.gz | tar xz -C cache/vuln-list-redos-bdu --strip-components=1
