@@ -83,7 +83,7 @@ func (vs *VulnSrc) parse(rootDir string) ([]Definition, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("error in RedOS Linux OVAL walk: %w")
+		return nil, xerrors.Errorf("error in RedOS Linux OVAL walk: %w", err)
 	}
 	return ovals, nil
 }
