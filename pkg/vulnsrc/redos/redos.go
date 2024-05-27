@@ -2,392 +2,238 @@ package redos
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
-	"os"
-	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/an1kelesh/trivy-db/pkg/db"
 	"github.com/an1kelesh/trivy-db/pkg/types"
+	"github.com/an1kelesh/trivy-db/pkg/utils"
 	ustrings "github.com/an1kelesh/trivy-db/pkg/utils/strings"
 	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
+	version "github.com/knqyf263/go-rpm-version"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/xerrors"
-
-	//"regexp"
-	"strings"
-)
-
-const (
-	rootBucket = "redos"
-	redosDir   = "vuln-list-redos"
 )
 
 var (
-	vendorCVEs []CveVendor
-	source     = types.DataSource{
+	platform = "RedOS Linux %s"
+	redosDir = filepath.Join("oval", "redos")
+	source   = types.DataSource{
 		ID:   vulnerability.RedOS,
-		Name: "redos",
-		URL:  "",
+		Name: "Red OS OVAL definitions",
+		URL:  "https://redos.red-soft.ru/support/secure/redos.xml",
 	}
 )
 
+type PutInput struct {
+	VulnID     string
+	Vuln       types.VulnerabilityDetail
+	Advisories map[AffectedPackage]types.Advisory
+	OVAL       Definition
+}
+
+type DB interface {
+	db.Operation
+	Put(*bolt.Tx, PutInput) error
+	Get(release, pkgName string) ([]types.Advisory, error)
+}
+
 type VulnSrc struct {
-	dbc db.Operation
+	DB // Those who want to customize Trivy DB can override put/get methods.
 }
 
-func NewVulnSrc() VulnSrc {
-	return VulnSrc{
-		dbc: db.Config{},
+type RedOS struct {
+	db.Operation
+}
+
+func NewVulnSrc() *VulnSrc {
+	return &VulnSrc{
+		DB: &RedOS{Operation: db.Config{}},
 	}
 }
 
-func (vs VulnSrc) Name() types.SourceID {
-	return vulnerability.RedOS
+func (vs *VulnSrc) Name() types.SourceID {
+	return source.ID
 }
 
-func (vs VulnSrc) Update(dir string) error {
-	rootDir := filepath.Join(dir, redosDir, "oval")
-	branches, err := os.ReadDir(rootDir)
+func (vs *VulnSrc) Update(dir string) error {
+	rootDir := filepath.Join(dir, "vuln-list", redosDir)
+	ovals, err := vs.parse(rootDir)
 	if err != nil {
-		return xerrors.Errorf("unable to list directory entries (%s): %w", rootDir, err)
+		return err
 	}
-
-	advisories := map[bucket]AdvisorySpecial{}
-	for _, branch := range branches {
-		log.Printf("    Parsing %s", branch.Name())
-		branchDir := filepath.Join(rootDir, branch.Name())
-		products, err := os.ReadDir(branchDir)
-		if err != nil {
-			return xerrors.Errorf("unable to get a list of directory entries (%s): %w", branchDir, err)
-		}
-
-		for _, f := range products {
-			definitions, err := parseOVAL(filepath.Join(branchDir, f.Name()))
-			if err != nil {
-				return xerrors.Errorf("failed to parse OVAL stream: %w", err)
-			}
-
-			advisories = vs.mergeAdvisories(advisories, definitions)
-
-		}
-	}
-	if err = vs.putVendorCVEs(); err != nil {
-		return xerrors.Errorf("put vendor cve error: %s", err)
-	}
-	if err = vs.save(advisories); err != nil {
-		return xerrors.Errorf("save error: %w", err)
+	if err = vs.put(ovals); err != nil {
+		return xerrors.Errorf("error in RedOS Linux OVAL save: %w", err)
 	}
 
 	return nil
 }
 
-func parseOVAL(dir string) (map[bucket]DefinitionSpecial, error) {
-	tests, err := parseTests(dir)
+func (vs *VulnSrc) parse(rootDir string) ([]Definition, error) {
+	var ovals []Definition
+	err := utils.FileWalk(rootDir, func(r io.Reader, path string) error {
+		var oval Definition
+		if err := json.NewDecoder(r).Decode(&oval); err != nil {
+			return xerrors.Errorf("failed to decode RedOS Linux OVAL JSON: %w", err)
+		}
+		ovals = append(ovals, oval)
+		return nil
+	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse tests: %w", err)
+		return nil, xerrors.Errorf("error in RedOS Linux OVAL walk: %w")
 	}
-
-	var definitions Definitions
-
-	err = unmarshalJSONFile(&definitions, path.Join(dir, "definitions.json"))
-	if err != nil {
-		return nil, xerrors.Errorf("RedOS OVAL parse error: %w", err)
-	}
-
-	return parseDefinitions(definitions, tests), nil
+	return ovals, nil
 }
 
-func parseDefinitions(definitions Definitions, tests map[string]RpmInfoTestSpecial) map[bucket]DefinitionSpecial {
-	defs := map[bucket]DefinitionSpecial{}
+func (vs *VulnSrc) put(ovals []Definition) error {
+	log.Println("Saving RedOS Linux OVAL")
 
-	for _, advisory := range definitions.Definition {
-		if strings.Contains(advisory.ID, "unaffected") {
-			continue
+	err := vs.BatchUpdate(func(tx *bolt.Tx) error {
+		return vs.commit(tx, ovals)
+	})
+	if err != nil {
+		return xerrors.Errorf("error in batch update: %w", err)
+	}
+
+	return nil
+}
+
+func (vs *VulnSrc) commit(tx *bolt.Tx, ovals []Definition) error {
+	for _, oval := range ovals {
+
+		var vulnIDs []string
+		for _, Reference := range oval.Metadata.References {
+			vulnIDs = append(vulnIDs, Reference.RefID)
+		}
+		advisories := map[AffectedPackage]types.Advisory{}
+		affectedPkg := walkRedOS(oval.Criteria, "", []AffectedPackage{})
+		for _, affectedPkg := range affectedPkg {
+			if affectedPkg.Package.Name == "" {
+				continue
+			}
+			platformName := affectedPkg.PlatformName()
+			if err := vs.PutDataSource(tx, platformName, source); err != nil {
+				return xerrors.Errorf("failed to put data source: %w", err)
+			}
+
+			advisories[affectedPkg] = types.Advisory{
+				FixedVersion: affectedPkg.Package.FixedVersion,
+			}
 		}
 
-		affectedPkgs := walkCriterion(advisory.Criteria, tests)
-		for _, affectedPkg := range affectedPkgs {
-			pkgName := affectedPkg.Name
+		var references []string
+		for _, ref := range oval.Metadata.References {
+			references = append(references, ref.RefURL)
+		}
 
-			redosID := vendorID(advisory.Metadata.References)
-
-			var cveEntries []CveEntry
-			vendorCve := vendorCVE(advisory.Metadata)
-			cveEntries = append(cveEntries, vendorCve)
-
-			vendorCVEs = append(vendorCVEs, CveVendor{CVE: vendorCve, Title: advisory.Metadata.Title,
-				Description: advisory.Metadata.Description, References: toReferences(advisory.Metadata.References)})
-
-			for _, bdu := range advisory.Metadata.Advisory.BDUs {
-				bduEntry := CveEntry{
-					ID:       bdu.CveID,
-					Severity: severityFromImpact(bdu.Impact),
-				}
-				cveEntries = append(cveEntries, bduEntry)
-				vendorCVEs = append(vendorCVEs, CveVendor{CVE: bduEntry, Title: "", Description: "", References: []string{bdu.Href}})
+		for _, vulnID := range vulnIDs {
+			vuln := types.VulnerabilityDetail{
+				Description: oval.Metadata.Description,
+				References:  referencesFromContains(references, []string{vulnID}),
+				Title:       oval.Metadata.Title,
+				Severity:    severityFromThreat(oval.Metadata.Advisory.Severity),
 			}
 
-			for _, cve := range advisory.Metadata.Advisory.Cves {
-				cveEntries = append(cveEntries, CveEntry{
-					ID:       cve.CveID,
-					Severity: severityFromImpact(cve.Impact),
-				})
-			}
-
-			if redosID != "" {
-				bkt := bucket{
-					pkgName: pkgName,
-					vulnID:  redosID,
-				}
-				defs[bkt] = DefinitionSpecial{
-					Entry: Entry{
-						Cves:            cveEntries,
-						FixedVersion:    affectedPkg.FixedVersion,
-						AffectedCPEList: cpeToList(advisory.Metadata.Advisory.AffectedCpeList),
-						Arches:          affectedPkg.Arches,
-					},
-				}
-			} else {
-				for _, cve := range cveEntries {
-					bkt := bucket{
-						pkgName: pkgName,
-						vulnID:  cve.ID,
-					}
-					defs[bkt] = DefinitionSpecial{
-						Entry: Entry{
-							Cves: []CveEntry{
-								{
-									Severity: cve.Severity,
-								},
-							},
-							FixedVersion:    affectedPkg.FixedVersion,
-							AffectedCPEList: cpeToList(advisory.Metadata.Advisory.AffectedCpeList),
-							Arches:          affectedPkg.Arches,
-						},
-					}
-				}
+			err := vs.Put(tx, PutInput{
+				VulnID:     vulnID,
+				Vuln:       vuln,
+				Advisories: advisories,
+				OVAL:       oval,
+			})
+			if err != nil {
+				return xerrors.Errorf("db put error: %w", err)
 			}
 		}
 	}
 
-	return defs
+	return nil
 }
 
-func walkCriterion(cri Criteria, tests map[string]RpmInfoTestSpecial) []pkg {
-	var packages []pkg
+func (r *RedOS) Put(tx *bolt.Tx, input PutInput) error {
+	if err := r.PutVulnerabilityDetail(tx, input.VulnID, source.ID, input.Vuln); err != nil {
+		return xerrors.Errorf("failed to save RedOS Linux OVAL vulnerability: %w", err)
+	}
 
+	if err := r.PutVulnerabilityID(tx, input.VulnID); err != nil {
+		return xerrors.Errorf("failed to save %s: %w", input.VulnID, err)
+	}
+	for pkg, advisory := range input.Advisories {
+		platformName := pkg.Package.Name
+		if err := r.PutAdvisoryDetail(tx, input.VulnID, pkg.Package.Name, []string{platformName}, advisory); err != nil {
+			return xerrors.Errorf("failed to save RedOS Linux advisory: %w", err)
+
+		}
+	}
+	return nil
+}
+
+func (r *RedOS) Get(release string, pkgName string) ([]types.Advisory, error) {
+	bucket := fmt.Sprintf(platform, release)
+	advisories, err := r.GetAdvisories(bucket, pkgName)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get RedOS Linux advisories: %w", err)
+	}
+	return advisories, nil
+}
+
+func walkRedOS(cri Criteria, osVer string, pkgs []AffectedPackage) []AffectedPackage {
+	var oval Definition
 	for _, c := range cri.Criterions {
-		t, ok := tests[c.TestRef]
-		if !ok {
+
+		ss := strings.Split(c.Comment, " version is less than ")
+		if len(ss) != 2 {
 			continue
 		}
-
-		var arches []string
-		if t.Arch != "" {
-			arches = strings.Split(t.Arch, "|")
-		}
-		packages = append(packages, pkg{
-			Name:         t.Name,
-			FixedVersion: t.FixedVersion,
-			Arches:       arches,
+		osVer := (walkRedOSver(oval.Metadata, ""))
+		pkgs = append(pkgs, AffectedPackage{
+			OSVer: osVer,
+			Package: Package{
+				Name:         ss[0],
+				FixedVersion: version.NewVersion(ss[1]).String(),
+			},
 		})
 	}
 
-	if len(cri.Criterias) == 0 {
-		return packages
-	}
-
 	for _, c := range cri.Criterias {
-		pkgs := walkCriterion(c, tests)
-		if len(pkgs) != 0 {
-			packages = append(packages, pkgs...)
-		}
+		pkgs = walkRedOS(c, osVer, pkgs)
 	}
-	return packages
+	return pkgs
 }
 
-func (vs VulnSrc) mergeAdvisories(advisories map[bucket]AdvisorySpecial, defs map[bucket]DefinitionSpecial) map[bucket]AdvisorySpecial {
-	for bkt, def := range defs {
-		if old, ok := advisories[bkt]; ok {
-			found := false
-			for i := range old.Entries {
-				if old.Entries[i].FixedVersion == def.Entry.FixedVersion && archesEqual(old.Entries[i].Arches, def.Entry.Arches) {
-					found = true
-					old.Entries[i].AffectedCPEList = ustrings.Merge(old.Entries[i].AffectedCPEList, def.Entry.AffectedCPEList)
-				}
-			}
-			if !found {
-				old.Entries = append(old.Entries, def.Entry)
-			}
-			advisories[bkt] = old
-		} else {
-			advisories[bkt] = AdvisorySpecial{
-				Entries: []Entry{def.Entry},
+func walkRedOSver(met Metadata, osVer string) string {
+	for _, d := range met.AffectedList {
+		if strings.HasPrefix(d.Platforms, "RED OS ") {
+			osVer = strings.TrimPrefix(d.Platforms, "RED OS ")
+		}
+	}
+	return osVer
+}
+
+func referencesFromContains(sources []string, matches []string) []string {
+	var references []string
+	for _, s := range sources {
+		for _, m := range matches {
+			if strings.Contains(s, m) {
+				references = append(references, s)
 			}
 		}
 	}
-
-	return advisories
+	return ustrings.Unique(references)
 }
 
-func (vs VulnSrc) save(advisories map[bucket]AdvisorySpecial) error {
-	err := vs.dbc.BatchUpdate(func(tx *bolt.Tx) error {
-		if err := vs.dbc.PutDataSource(tx, rootBucket, source); err != nil {
-			return xerrors.Errorf("failed to put data source: %w", err)
-		}
-		for bkt, advisory := range advisories {
-			if err := vs.dbc.PutAdvisoryDetail(tx, bkt.vulnID, bkt.pkgName, []string{rootBucket}, advisory); err != nil {
-				return xerrors.Errorf("failed to RedOS OVAL advisory: %w", err)
-			}
-
-			if err := vs.dbc.PutVulnerabilityID(tx, bkt.vulnID); err != nil {
-				return xerrors.Errorf("failed to put severity: %w", err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return xerrors.Errorf("batch update error: %w", err)
-	}
-	return nil
-}
-
-func vendorCVE(metadata Metadata) CveEntry {
-	var id string
-	for _, r := range metadata.References {
-		if strings.Contains(r.RefID, "RedOS") {
-			id = r.RefID
-		}
-	}
-	return CveEntry{ID: id, Severity: severityFromImpact(metadata.Advisory.Severity)}
-}
-
-func (vs VulnSrc) putVendorCVEs() error {
-	err := vs.dbc.BatchUpdate(func(tx *bolt.Tx) error {
-		for _, cve := range vendorCVEs {
-			err := vs.putVendorVulnerabilityDetail(tx, cve)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return err
-}
-func (vs VulnSrc) putVendorVulnerabilityDetail(tx *bolt.Tx, cve CveVendor) error {
-	vuln := types.VulnerabilityDetail{
-		CvssScore:    0,
-		CvssVector:   "",
-		CvssScoreV3:  0,
-		CvssVectorV3: "",
-		Severity:     cve.CVE.Severity,
-		References:   cve.References,
-		Title:        cve.Title,
-		Description:  cve.Description,
-	}
-	if err := vs.dbc.PutVulnerabilityDetail(tx, cve.CVE.ID, vulnerability.RedOS, vuln); err != nil {
-		return xerrors.Errorf("failed to save RedOS vulnerability: %w", err)
-	}
-
-	if err := vs.dbc.PutVulnerabilityID(tx, cve.CVE.ID); err != nil {
-		return xerrors.Errorf("failed to save the vulnerability ID: %w", err)
-	}
-	return nil
-}
-
-func (vs VulnSrc) Get(pkgName, cpe string) ([]types.Advisory, error) {
-	rawAdvisories, err := vs.dbc.ForEachAdvisory([]string{rootBucket}, pkgName)
-	if err != nil {
-		return nil, xerrors.Errorf("unable to iterate advisories: %w", err)
-	}
-
-	var advisories []types.Advisory
-	for vulnID, v := range rawAdvisories {
-		if len(v.Content) == 0 {
-			continue
-		}
-
-		var adv AdvisorySpecial
-		if err = json.Unmarshal(v.Content, &adv); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal advisory JSON: %w", err)
-		}
-
-		for _, entry := range adv.Entries {
-			if !contains(entry.AffectedCPEList, cpe) {
-				continue
-			}
-			for _, cve := range entry.Cves {
-				advisory := types.Advisory{
-					Severity:     cve.Severity,
-					FixedVersion: entry.FixedVersion,
-					Arches:       entry.Arches,
-				}
-
-				if strings.HasPrefix(vulnID, "CVE-") {
-					advisory.VulnerabilityID = vulnID
-				} else {
-					advisory.VulnerabilityID = cve.ID
-					advisory.VendorIDs = []string{vulnID}
-				}
-
-				advisories = append(advisories, advisory)
-			}
-		}
-	}
-
-	return advisories, nil
-}
-func contains(lst []string, val string) bool {
-	for _, e := range lst {
-		if e == val {
-			return true
-		}
-	}
-	return false
-}
-
-func toReferences(references []Reference) []string {
-	var data []string
-	for _, r := range references {
-		data = append(data, r.RefURL)
-	}
-	return data
-}
-func cpeToList(cpes AffectedCpeList) []string {
-	var list []string
-	return append(list, cpes.Cpe...)
-}
-func archesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-func severityFromImpact(sev string) types.Severity {
-	switch strings.ToLower(sev) {
-	case "low":
+func severityFromThreat(sev string) types.Severity {
+	switch sev {
+	case "Low":
 		return types.SeverityLow
-	case "medium":
+	case "Medium":
 		return types.SeverityMedium
-	case "high":
+	case "High":
 		return types.SeverityHigh
-	case "critical":
+	case "Critical":
 		return types.SeverityCritical
 	}
 	return types.SeverityUnknown
-}
-func vendorID(refs []Reference) string {
-	for _, ref := range refs {
-		switch ref.Source {
-		case "ALTPU":
-			return ref.RefID
-		}
-	}
-	return ""
 }
