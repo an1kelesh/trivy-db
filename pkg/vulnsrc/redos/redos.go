@@ -60,7 +60,7 @@ func (vs *VulnSrc) Name() types.SourceID {
 }
 
 func (vs *VulnSrc) Update(dir string) error {
-	rootDir := filepath.Join(dir, "vuln-list", redosDir)
+	rootDir := filepath.Join(dir, "vuln-list-redos", redosDir)
 	ovals, err := vs.parse(rootDir)
 	if err != nil {
 		return err
