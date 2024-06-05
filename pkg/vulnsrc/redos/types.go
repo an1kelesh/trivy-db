@@ -71,10 +71,6 @@ type Criterion struct {
 	TestRef string `json:"test_ref"`
 }
 
-//type VulnerabilityDetail struct {
-//	Description string `json:"description"`
-//}
-
 type AffectedPackage struct {
 	Package Package
 	OSVer   string
