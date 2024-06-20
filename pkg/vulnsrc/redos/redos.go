@@ -72,10 +72,10 @@ func (vs *VulnSrc) Update(dir string) error {
 	return nil
 }
 
-func (vs *VulnSrc) parse(rootDir string) ([]Definition, error) {
-	var ovals []Definition
+func (vs *VulnSrc) parse(rootDir string) ([]Oval, error) {
+	var ovals []Oval
 	err := utils.FileWalk(rootDir, func(r io.Reader, path string) error {
-		var oval Definition
+		var oval Oval
 		if err := json.NewDecoder(r).Decode(&oval); err != nil {
 			return xerrors.Errorf("failed to decode RedOS Linux OVAL JSON: %w", err)
 		}
@@ -88,7 +88,7 @@ func (vs *VulnSrc) parse(rootDir string) ([]Definition, error) {
 	return ovals, nil
 }
 
-func (vs *VulnSrc) put(ovals []Definition) error {
+func (vs *VulnSrc) put(ovals []Oval) error {
 	log.Println("Saving RedOS Linux OVAL")
 
 	err := vs.BatchUpdate(func(tx *bolt.Tx) error {
@@ -101,54 +101,54 @@ func (vs *VulnSrc) put(ovals []Definition) error {
 	return nil
 }
 
-func (vs *VulnSrc) commit(tx *bolt.Tx, ovals []Definition) error {
+func (vs *VulnSrc) commit(tx *bolt.Tx, ovals []Oval) error {
 	for _, oval := range ovals {
-
-		var vulnIDs []string
-		for _, Reference := range oval.Metadata.References {
-			vulnIDs = append(vulnIDs, Reference.RefID)
-		}
-		advisories := map[AffectedPackage]types.Advisory{}
-		affectedPkg := walkRedOS(oval.Criteria, "", []AffectedPackage{})
-		for _, affectedPkg := range affectedPkg {
-			if affectedPkg.Package.Name == "" {
-				continue
+		for _, ova := range oval.OvalDefinitions.Definitions.Definition {
+			var vulnIDs []string
+			for _, Reference := range ova.Metadata.Reference {
+				vulnIDs = append(vulnIDs, Reference.RefID)
 			}
-			platformName := affectedPkg.PlatformName()
-			if err := vs.PutDataSource(tx, platformName, source); err != nil {
-				return xerrors.Errorf("failed to put data source: %w", err)
-			}
+			advisories := map[AffectedPackage]types.Advisory{}
+			affectedPkg := walkRedOS(ova.Criteria, "", []AffectedPackage{})
+			for _, affectedPkg := range affectedPkg {
+				if affectedPkg.Package.Name == "" {
+					continue
+				}
+				platformName := affectedPkg.PlatformName()
+				if err := vs.PutDataSource(tx, platformName, source); err != nil {
+					return xerrors.Errorf("failed to put data source: %w", err)
+				}
 
-			advisories[affectedPkg] = types.Advisory{
-				FixedVersion: affectedPkg.Package.FixedVersion,
-			}
-		}
-
-		var references []string
-		for _, ref := range oval.Metadata.References {
-			references = append(references, ref.RefURL)
-		}
-
-		for _, vulnID := range vulnIDs {
-			vuln := types.VulnerabilityDetail{
-				Description: oval.Metadata.Description,
-				References:  referencesFromContains(references, []string{vulnID}),
-				Title:       oval.Metadata.Title,
-				Severity:    severityFromThreat(oval.Metadata.Advisory.Severity),
+				advisories[affectedPkg] = types.Advisory{
+					FixedVersion: affectedPkg.Package.FixedVersion,
+				}
 			}
 
-			err := vs.Put(tx, PutInput{
-				VulnID:     vulnID,
-				Vuln:       vuln,
-				Advisories: advisories,
-				OVAL:       oval,
-			})
-			if err != nil {
-				return xerrors.Errorf("db put error: %w", err)
+			var references []string
+			for _, ref := range ova.Metadata.Reference {
+				references = append(references, ref.RefURL)
+			}
+
+			for _, vulnID := range vulnIDs {
+				vuln := types.VulnerabilityDetail{
+					Description: ova.Metadata.Description,
+					References:  referencesFromContains(references, []string{vulnID}),
+					Title:       ova.Metadata.Title,
+					Severity:    severityFromThreat(ova.Metadata.Advisory.Severity),
+				}
+
+				err := vs.Put(tx, PutInput{
+					VulnID:     vulnID,
+					Vuln:       vuln,
+					Advisories: advisories,
+					OVAL:       ova,
+				})
+				if err != nil {
+					return xerrors.Errorf("db put error: %w", err)
+				}
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -181,9 +181,9 @@ func (r *RedOS) Get(release string, pkgName string) ([]types.Advisory, error) {
 
 func walkRedOS(cri Criteria, osVer string, pkgs []AffectedPackage) []AffectedPackage {
 	var oval Definition
-	for _, c := range cri.Criterions {
+	for _, c := range cri.Criterion.Comment {
 
-		ss := strings.Split(c.Comment, " version is less than ")
+		ss := strings.Split(string(c), " version is less than ")
 		if len(ss) != 2 {
 			continue
 		}
@@ -204,9 +204,9 @@ func walkRedOS(cri Criteria, osVer string, pkgs []AffectedPackage) []AffectedPac
 }
 
 func walkRedOSver(met Metadata, osVer string) string {
-	for _, d := range met.AffectedList {
-		if strings.HasPrefix(d.Platforms, "RED OS ") {
-			osVer = strings.TrimPrefix(d.Platforms, "RED OS ")
+	for _, d := range met.Affected.Platform {
+		if strings.HasPrefix(string(d), "RED OS ") {
+			osVer = strings.TrimPrefix(string(d), "RED OS ")
 		}
 	}
 	return osVer
