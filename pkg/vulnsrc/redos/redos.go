@@ -3,6 +3,7 @@ package redos
 import (
 	"encoding/json"
 	"fmt"
+	version "github.com/knqyf263/go-rpm-version"
 	"io"
 	"log"
 	"path/filepath"
@@ -13,15 +14,16 @@ import (
 	"github.com/an1kelesh/trivy-db/pkg/utils"
 	ustrings "github.com/an1kelesh/trivy-db/pkg/utils/strings"
 	"github.com/an1kelesh/trivy-db/pkg/vulnsrc/vulnerability"
-	version "github.com/knqyf263/go-rpm-version"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/xerrors"
 )
 
 var (
-	platform = "RedOS Linux %s"
-	redosDir = filepath.Join("oval", "redos")
-	source   = types.DataSource{
+	platform        = "RedOS Linux %s"
+	targetPlatforms = []string{"RedOS Linux 7.1", "RedOS Linux 7.2", "RedOS Linux 7.3"}
+	redosDir        = filepath.Join("oval", "redos")
+
+	source = types.DataSource{
 		ID:   vulnerability.RedOS,
 		Name: "Red OS OVAL definitions",
 		URL:  "https://redos.red-soft.ru/support/secure/redos.xml",
@@ -109,12 +111,15 @@ func (vs *VulnSrc) commit(tx *bolt.Tx, ovals []Oval) error {
 				vulnIDs = append(vulnIDs, Reference.RefID)
 			}
 			advisories := map[AffectedPackage]types.Advisory{}
-			affectedPkg := walkRedOS(ova.Criteria, "", []AffectedPackage{})
+			affectedPkg := walkRedOS(ova.Criteria, ova.Metadata.Affected, "", []AffectedPackage{})
 			for _, affectedPkg := range affectedPkg {
 				if affectedPkg.Package.Name == "" {
 					continue
 				}
 				platformName := affectedPkg.PlatformName()
+				if !ustrings.InSlice(platformName, targetPlatforms) {
+					continue
+				}
 				if err := vs.PutDataSource(tx, platformName, source); err != nil {
 					return xerrors.Errorf("failed to put data source: %w", err)
 				}
@@ -179,43 +184,40 @@ func (r *RedOS) Get(release string, pkgName string) ([]types.Advisory, error) {
 	return advisories, nil
 }
 
-func walkRedOS(cri Criteria, osVer string, pkgs []AffectedPackage) []AffectedPackage {
-	var oval Definition
-	for _, c := range cri.Criterion.Comment {
-
-		ss := strings.Split(string(c), " version is less than ")
-		if len(ss) != 2 {
-			continue
-		}
-		osVer := (walkRedOSver(oval.Metadata, ""))
-		pkgs = append(pkgs, AffectedPackage{
-			OSVer: osVer,
-			Package: Package{
-				Name:         ss[0],
-				FixedVersion: version.NewVersion(ss[1]).String(),
-			},
-		})
+func walkRedOS(cri Criteria, affect Affected, osVer string, pkgs []AffectedPackage) []AffectedPackage {
+	if strings.HasPrefix(affect.Platform, "RED OS") {
+		osVer = strings.TrimPrefix(affect.Platform, "RED OS ")
 	}
-
+	ss := strings.Split(cri.Criterion.Comment, " version is less than ")
+	pkgs = append(pkgs, AffectedPackage{
+		OSVer: osVer,
+		Package: Package{
+			Name:         ss[0],
+			FixedVersion: version.NewVersion(ss[1]).String(),
+		},
+	})
 	for _, c := range cri.Criterias {
-		pkgs = walkRedOS(c, osVer, pkgs)
+		pkgs = walkRedOS(c, affect, osVer, pkgs)
 	}
 	return pkgs
 }
 
-func walkRedOSver(met Metadata, osVer string) string {
-	for _, d := range met.Affected.Platform {
-		if strings.HasPrefix(string(d), "RED OS ") {
-			osVer = strings.TrimPrefix(string(d), "RED OS ")
-		}
-	}
-	return osVer
-}
+//func walkRedOSver(affect Affected, osVer string) string {
+//	for _, d := range affect.Platform {
+//		if strings.HasPrefix(string(d), "RED OS ") {
+//			osVer = strings.TrimPrefix(string(d), "RED OS ")
+//		}
+//	}
+//	return osVer
+//}
 
 func referencesFromContains(sources []string, matches []string) []string {
 	var references []string
 	for _, s := range sources {
 		for _, m := range matches {
+			if strings.Contains(s, "redos") && strings.Contains(m, "ROS") {
+				references = append(references, s)
+			}
 			if strings.Contains(s, m) {
 				references = append(references, s)
 			}

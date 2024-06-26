@@ -64,6 +64,7 @@ type Affected struct {
 	Platform string `json:"platform"`
 	Product  string `json:"product"`
 	Family   string `json:"_family"`
+	Affect   []Affected
 }
 
 type Reference struct {
