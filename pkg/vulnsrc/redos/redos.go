@@ -26,7 +26,7 @@ var (
 	source = types.DataSource{
 		ID:   vulnerability.RedOS,
 		Name: "Red OS OVAL definitions",
-		URL:  "https://redos.red-soft.ru/support/secure/redos.xml",
+		URL:  "https://redos.red-soft.ru/support/secure",
 	}
 )
 
@@ -166,7 +166,7 @@ func (r *RedOS) Put(tx *bolt.Tx, input PutInput) error {
 		return xerrors.Errorf("failed to save %s: %w", input.VulnID, err)
 	}
 	for pkg, advisory := range input.Advisories {
-		platformName := pkg.Package.Name
+		platformName := pkg.PlatformName()
 		if err := r.PutAdvisoryDetail(tx, input.VulnID, pkg.Package.Name, []string{platformName}, advisory); err != nil {
 			return xerrors.Errorf("failed to save RedOS Linux advisory: %w", err)
 
@@ -201,15 +201,6 @@ func walkRedOS(cri Criteria, affect Affected, osVer string, pkgs []AffectedPacka
 	}
 	return pkgs
 }
-
-//func walkRedOSver(affect Affected, osVer string) string {
-//	for _, d := range affect.Platform {
-//		if strings.HasPrefix(string(d), "RED OS ") {
-//			osVer = strings.TrimPrefix(string(d), "RED OS ")
-//		}
-//	}
-//	return osVer
-//}
 
 func referencesFromContains(sources []string, matches []string) []string {
 	var references []string
