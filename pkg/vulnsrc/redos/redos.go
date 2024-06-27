@@ -193,7 +193,7 @@ func walkRedOS(cri Criteria, affect Affected, osVer string, pkgs []AffectedPacka
 		OSVer: osVer,
 		Package: Package{
 			Name:         ss[0],
-			FixedVersion: version.NewVersion(ss[1]).String(),
+			FixedVersion: version.NewVersion(ss[1]).String() + ".el7",
 		},
 	})
 	for _, c := range cri.Criterias {
