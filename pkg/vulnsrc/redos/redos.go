@@ -3,11 +3,12 @@ package redos
 import (
 	"encoding/json"
 	"fmt"
-	version "github.com/knqyf263/go-rpm-version"
 	"io"
 	"log"
 	"path/filepath"
 	"strings"
+
+	version "github.com/knqyf263/go-rpm-version"
 
 	"github.com/an1kelesh/trivy-db/pkg/db"
 	"github.com/an1kelesh/trivy-db/pkg/types"

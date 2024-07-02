@@ -7,22 +7,7 @@ type Oval struct {
 }
 
 type OvalDefinitions struct {
-	Generator         Generator   `json:"generator"`
-	Definitions       Definitions `json:"definitions"`
-	Tests             Tests       `json:"tests"`
-	Objects           Objects     `json:"objects"`
-	States            States      `json:"states"`
-	Xmlns             string      `json:"_xmlns"`
-	XmlnsXsi          string      `json:"_xmlns:xsi"`
-	XmlnsOval         string      `json:"_xmlns:oval"`
-	XmlnsOvalDef      string      `json:"_xmlns:oval-def"`
-	XsiSchemaLocation string      `json:"_xsi:schemaLocation"`
-}
-
-type Generator struct {
-	ProductName   ProductName   `json:"product_name"`
-	SchemaVersion SchemaVersion `json:"schema_version"`
-	Timestamp     Timestamp     `json:"timestamp"`
+	Definitions Definitions `json:"definitions"`
 }
 
 type ProductName struct {
@@ -108,57 +93,6 @@ type Criteria struct {
 type Criterion struct {
 	Comment string `json:"_comment"`
 	TestRef string `json:"_test_ref"`
-}
-
-type Tests struct {
-	RpminfoTest []RpminfoTest `json:"rpminfo_test"`
-}
-
-type RpminfoTest struct {
-	Object         Object `json:"object"`
-	State          State  `json:"state"`
-	Xmlns          string `json:"_xmlns"`
-	ID             string `json:"_id"`
-	Version        string `json:"_version"`
-	Check          string `json:"_check"`
-	CheckExistence string `json:"_check_existence"`
-	Comment        string `json:"_comment"`
-}
-
-type Object struct {
-	ObjectRef string `json:"_object_ref"`
-}
-
-type State struct {
-	StateRef string `json:"_state_ref"`
-}
-
-type Objects struct {
-	RpminfoObject []RpminfoObject `json:"rpminfo_object"`
-}
-
-type RpminfoObject struct {
-	Name    string `json:"name"`
-	Xmlns   string `json:"_xmlns"`
-	ID      string `json:"_id"`
-	Version string `json:"_version"`
-}
-
-type States struct {
-	RpminfoState []RpminfoState `json:"rpminfo_state"`
-}
-
-type RpminfoState struct {
-	Evr     Evr    `json:"evr"`
-	Xmlns   string `json:"_xmlns"`
-	ID      string `json:"_id"`
-	Version string `json:"_version"`
-}
-
-type Evr struct {
-	Datatype  string `json:"_datatype"`
-	Operation string `json:"_operation"`
-	Text      string `json:"__text"`
 }
 
 type AffectedPackage struct {
